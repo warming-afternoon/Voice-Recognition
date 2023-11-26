@@ -4,23 +4,21 @@
 
 ## 结构
 
-├── speech_emotion_recognition1             // 人声情感识别模型实现
+├── data                                    //数据集
 
-│   
+├── source                                  //UI所用资源
 
-├── test                                    //
+├── tool                                    //工具
 
-│   ├──predict.py //使用模型对指定文件夹内文件进行预测，以测试模型性能
+│   ├──predict.py                           //使用模型对指定文件夹内文件进行预测，以测试模型性能（未匹配新模型，无用）
 
-│   ├──process.py //对上传语音进行MFCC处理，提取特征以供模型识别
+├──process.py //对上传语音进行处理，提取特征并使用模型进行识别
 
-│   ├──recorder_ui.py //录音功能的UI，未完成
+├──recorder_ui.py //录音功能的UI，未完成
 
-│   ├──recorder1.py //录音功能，仍需修改
+├──recorder1.py //录音功能，仍需修改
 
-│   ├──train.py //未知
-
-│   ├──ui.py //前端UI界面，使用模型对人声情感进行辨别
+├──ui.py //前端UI界面，使用模型对音频进行辨别
 
 
 
