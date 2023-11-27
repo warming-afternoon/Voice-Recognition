@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-
-# -*- coding: utf-8 -*-
-
 import pyaudio
 import time
 import threading
@@ -48,16 +44,12 @@ class Recorder():
         if not filename.endswith(".wav"):
             filename = filename + ".wav"
 
-
-
-
         wf = wave.open(filename, 'wb')
         wf.setnchannels(self.CHANNELS)
         wf.setsampwidth(p.get_sample_size(self.FORMAT))
         wf.setframerate(self.RATE)
         wf.writeframes(b''.join(self._frames))
         wf.close()
-        print("Saved")
 
     def save2(self, filename):
         p = pyaudio.PyAudio()
@@ -95,7 +87,8 @@ class Recorder():
             os.mkdir(cur_dir)
         return cur_dir
 
-    def record(self):
+
+    def record_old(self):
         print('请按下回车键开始录音：')
         a = msvcrt.getche()
         a = ord(a)
@@ -118,7 +111,7 @@ class Recorder():
         i = 2
         print('开始录制')
 
-        self.record()
+        self.record_old()
         self.save1("1_1.wav")
         # for i in range(2,m+count+1):
         while i < (1 + count + 1):
@@ -127,11 +120,11 @@ class Recorder():
             input_YN = bytes.decode(input_YN)
             if input_YN.upper() == 'Y':
                 count += 1
-                self.record()
+                self.record_old()
                 self.save1("1_%d.wav" % (i - count))
                 i += 1
             else:
-                self.record()
+                self.record_old()
                 self.save1("1_%d.wav" % (i - count))
                 i += 1
 
@@ -141,7 +134,7 @@ class Recorder():
         n = self.negative_n()
         print('开始负样本的录制')
         print("请以不同的语速口音朗读文章")
-        self.record()
+        self.record_old()
         self.save2("0_1.wav")
         while i < (n + count + 1):
             print('继续录音请按下回车键，重新录音请输入y or Y：')
@@ -149,11 +142,11 @@ class Recorder():
             input_YN = bytes.decode(input_YN)
             if input_YN.upper() == 'Y':
                 count += 1
-                self.record()
+                self.record_old()
                 self.save2("0_%d.wav" % (i - count))
                 i += 1
             else:
-                self.record()
+                self.record_old()
                 self.save2("0_%d.wav" % (i - count))
                 i += 1
 

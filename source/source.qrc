@@ -1,5 +1,5 @@
 <RCC>
   <qresource prefix="pic">
-    <file>test/source/QQ图片20220424222950.png</file>
+    <file>source/QQ图片20220424222950.png</file>
   </qresource>
 </RCC>

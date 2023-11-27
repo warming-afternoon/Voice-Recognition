@@ -14,8 +14,22 @@ import tensorflow as tf
 from keras.models import load_model
 mean_signal_length = 32000
 
+#目前所用特征提取函数
+def get_feature_vector(file_path: str):
+    audio_dataset_path = glob.glob(file_path)
+    df = autoaudio.AutomatedExtractor_multiple(audio_dataset_path)
+    df = df.map(lambda x: np.median(x))
+    x = df.values
+    # x = np.concatenate((x1,x),axis=0)
+    x = np.array(x)
+    x2 = np.loadtxt('result1.txt')
+    x = np.vstack((x, x2))
+    x = Normalizer(norm='l2').fit_transform(x)
+    x = StandardScaler().fit_transform(x)
+    x = np.expand_dims(x[0], axis=0)
+    return x
 
-
+#原mel特征提取函数
 def get_mel(path):
     # sr=None声音保持原采样频率， mono=False声音保持原通道数
     data, fs = librosa.load(path, sr=None, mono=False)
@@ -36,27 +50,7 @@ def get_mel(path):
     f.savefig('Spectrogram.jpg')
     f.clear()  # 释放内存
 
-
-def get_feature_vector(file_path: str):
-    # audio_dataset_path1 = glob.glob(file_path)
-    # df1 = autoaudio.AutomatedExtractor_multiple(audio_dataset_path1)
-    # df1 = df1.map(lambda x: np.median(x))
-    # x1 = df1.values
-    # audio_dataset_path = glob.glob(r"C:\Users\ZhiQ\Desktop\123\Voice-Recognition-main\data\test/*.wav")
-    audio_dataset_path = glob.glob(file_path)
-    df = autoaudio.AutomatedExtractor_multiple(audio_dataset_path)
-    df = df.map(lambda x: np.median(x))
-    x = df.values
-    # x = np.concatenate((x1,x),axis=0)
-    x = np.array(x)
-    x2 = np.loadtxt('result1.txt')
-    x = np.vstack((x, x2))
-    x = Normalizer(norm='l2').fit_transform(x)
-    x = StandardScaler().fit_transform(x)
-    x = np.expand_dims(x[0], axis=0)
-    return x
-
-
+#原MFCC特征提取函数
 def get_feature_vector_from_mfcc(file_path: str, flatten: bool,
                                  mfcc_len: int = 7) -> np.ndarray:
     """
@@ -104,16 +98,12 @@ def get_feature_vector_from_mfcc(file_path: str, flatten: bool,
 
 
 if __name__ == '__main__':
-    # to_flatten = False
-    # path = r'E:\code\python\speech_emotion_recognition1\data\angry\angry_1_201.wav'
-    # sample = get_feature_vector_from_mfcc(path, flatten=to_flatten)
-    # get_mel(path)
 
-        model_path = '.\machinelisten.h5'  # 模型路径
-        model = load_model(model_path, compile=False)
-        sample = get_feature_vector('./data/anomaly_id_00_00000008.wav')
-        result = model.predict(np.array(sample))
-        threshold = 0.20162924039608465
-        import tensorflow as tf
-        prediction_loss = tf.keras.losses.mae(result, sample)
-        print(prediction_loss)
+    model_path = '.\machinelisten.h5'  # 模型路径
+    model = load_model(model_path, compile=False)
+    sample = get_feature_vector('./data/anomaly_id_00_00000008.wav')
+    result = model.predict(np.array(sample))
+    threshold = 0.20162924039608465
+    import tensorflow as tf
+    prediction_loss = tf.keras.losses.mae(result, sample)
+    print(prediction_loss)
