@@ -14,7 +14,7 @@
 
 ├──process.py //对上传语音进行处理，提取特征并使用模型进行识别
 
-├──recorder_ui.py //录音功能的UI，未完成
+├──recorder_ui.py //录音功能的UI，基本已并入主界面，无用
 
 ├──recorder1.py //录音功能，仍需修改
 

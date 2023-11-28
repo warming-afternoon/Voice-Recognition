@@ -163,6 +163,11 @@ class Ui_MainWindow(QMainWindow):
         self.textBrowser.append('文件保存名为'+name)
         self.path=saveName
 
+    #实时识别（未完成）
+    def time_recongniton(self):
+        self.start = time.time()
+        
+    
     #对音频进行识别
     def start_recongniton(self):
         self.textBrowser.append('正在识别中...')
