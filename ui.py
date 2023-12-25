@@ -3,33 +3,44 @@ import time
 from os import getcwd
 
 from playsound import playsound
+
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtWidgets import QApplication, QMainWindow
-from PyQt5.QtWidgets import QFileDialog
-from recorder_ui import Ui_Dialog
-from recorder1 import Recorder
+from PyQt5.QtWidgets import QApplication, QMainWindow,QFileDialog
+from PyQt5.QtCore import QThread,QObject,pyqtSignal
+
+from Test import TimeRecongniton,Recorder,Memento
 
 import process
 from keras.models import load_model
 import numpy as np
-import tensorflow as tf
-
-#未完成，暂时无用
-class UiManage():
-    uiList = []
 
 # 主UI
 class Ui_MainWindow(QMainWindow):
     def __init__(self):
         super(Ui_MainWindow, self).__init__()
-        self.path = getcwd()
+        self.path='./data/save/' #音频保存路径
+        self.chooseFile=''  #选中的文件
+        self.start = time.time()
+        
+        self.is_time_recoed = False
+        
+        self.resourceList=[]
+        self.normalResource=[]
+        self.abnormalResource=[]
+        
+        self.rec = Recorder()
+        self.thread_one = QThread()
+        self.rec.moveToThread(self.thread_one)
+        self.thread_one.started.connect(self.rec.record)
+        
+        # self.timeRecongniton=TimeRecongniton()
+        # self.thread_two = QThread()
+        # self.timeRecongniton.moveToThread(self.thread_two)
+        
         self.setupUi(self)
         self.retranslateUi(self)
-        self.rec = Recorder()
-        self.start = time.time()
-        self.stop = self.start
         self.slot_init()  # 槽函数设置
-        self.model_path = '.\machinelisten.h5'  # 模型路径
+        self.model_path = '.\machinelisten_final.h5'  # 模型路径
         self.model = load_model(self.model_path, compile=False)
     
     #设置UI界面外观
@@ -126,7 +137,7 @@ class Ui_MainWindow(QMainWindow):
     #设置文本
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "音频识别"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "机器故障识别"))
         self.label.setText(_translate("MainWindow", "机器故障识别系统"))
         self.pushButton.setText(_translate("MainWindow", "开始录音"))
         self.pushButton_2.setText(_translate("MainWindow", "停止录音"))
@@ -138,55 +149,100 @@ class Ui_MainWindow(QMainWindow):
 
     #定义槽函数，即按钮按下后响应函数
     def slot_init(self):
-        self.pushButton.clicked.connect(self.record)
+        self.pushButton.clicked.connect(self.time_record)
         self.pushButton_2.clicked.connect(self.stop_record)
-        #self.pushButton_3.clicked.connect(self.display_feature1)
+        self.pushButton_3.clicked.connect(self.time_recongniton)
         self.pushButton_4.clicked.connect(self.choose_file)
         self.pushButton_5.clicked.connect(self.play_video)
         self.pushButton_6.clicked.connect(self.start_recongniton)
         self.pushButton_7.clicked.connect(self.closeEvent)
     
-    #录音（未完成）
+
+    #录音
     def record(self):
+        self.is_time_recoed = False
+        self.rec.set_isTime(self.is_time_recoed)
         self.textBrowser.append('已开始录音')
         self.start = time.time()
-        self.rec.start()
+        self.rec.set_fileList(self.resourceList)
+        self.thread_one.start()
+
+    #实时识别的录音部分
+    def time_record(self):
+        self.is_time_recoed = True
+        self.rec.set_isTime(self.is_time_recoed)
+        self.textBrowser.append('已开始录音')
+        self.start = time.time()
+        self.rec.set_fileList(self.resourceList)
+        self.thread_one.start()
+
+    #实时识别的识别部分（未完成）
+    def time_recongniton(self):
+
+        self.thread.started.connect(self.timeRecongniton.run) # 通知开始
+        self.timeRecongniton.finished.connect(self.thread.quit) # 结束后通知结束
+        self.timeRecongniton.finished.connect(self.timeRecongniton.deleteLater) # 完成后删除对象
+        self.thread.finished.connect(self.thread.deleteLater) # 完成后删除对象
+        self.timeRecongniton.progress.connect(self.result_display) # 绑定 progress 的信号
+
+        self.thread.start()
+        # Final resets (结束的时候做的事)
+        self.thread.finished.connect(
+            lambda: self.textBrowser.append('测试用')
+        )
         
+        
+
+    ##实时识别结果显示(未完成)
+    def result_display(self,result):
+        self.textBrowser.append('识别结果：正常\n用时：%.2f' % result)
+    
+    
+    
+    
     #停止录音（未完成）
     def stop_record(self):
-        self.stop = time.time()
+        stop = time.time()
         self.rec.stop()
-        name='{:.1f}'.format(self.stop)+'.wav'
-        saveName='./data/save/'+name
-        self.rec.save1(saveName)
-        self.textBrowser.append('录音结束，共录制%.2f 秒'% (self.stop-self.start))
-        self.textBrowser.append('文件保存名为'+name)
-        self.path=saveName
-
-    #实时识别（未完成）
-    def time_recongniton(self):
-        self.start = time.time()
+        self.resourceList=self.rec.get_fileList()
         
+        if (self.is_time_recoed == False):
+            self.chooseFile= str(self.resourceList[-1])
+            self.textBrowser.append('录音结束，共录制%.1f 秒'% (stop-self.start))
+            self.textBrowser.append('文件保存名为'+self.chooseFile)
+        else:
+            self.textBrowser.append('录音结束，共识别%.1f 秒'% (stop-self.start))
+
     
     #对音频进行识别
     def start_recongniton(self):
-        self.textBrowser.append('正在识别中...')
-        sample = process.get_feature_vector(self.path)
         start = time.time()
-        result = self.model.predict(np.array(sample))
-        threshold = 0.20162924039608465
-        prediction_loss = tf.keras.losses.mae(result, sample)
+        self.textBrowser.append('正在识别中...')
+        
+        prediction = self.predict()
+        
         end = time.time() - start
-        if prediction_loss < threshold:
+        threshold = 0.91  # 来自ROC曲线
+        predicted_labels = (prediction[:, 1] > threshold).astype(int)
+        if 0 in predicted_labels:
             self.textBrowser.append('识别结果：异常！！！请及时处理\n用时：%.2f' % end)
-        elif prediction_loss >= threshold:
+        else:
             self.textBrowser.append('识别结果：正常\n用时：%.2f' % end)
 
             print(end)
     
+    #音频预处理及使用模型预测
+    def predict(self):
+
+        sample = process.get_feature_vector(self.chooseFile)#特征提取、预处理
+        sample = np.expand_dims(sample, axis=0)
+        model1 = self.model
+        result = model1.predict(sample)
+        return result
+        
     #播放音频
     def play_video(self):
-        playsound(self.path)
+        playsound(self.chooseFile)
     
     #选择音频
     def choose_file(self):
@@ -194,7 +250,7 @@ class Ui_MainWindow(QMainWindow):
             self.centralwidget, "选取图片文件",
             './data',  # 起始路径
             "(*.wav)")  # 文件类型
-        self.path = fileName_choose  # 保存路径
+        self.chooseFile = fileName_choose  
 
         if fileName_choose != '':
             self.textBrowser.append(fileName_choose + '文件已选中')
@@ -215,11 +271,7 @@ class Ui_MainWindow(QMainWindow):
             app.quit()
         else:
             pass
-
-
-def uifun1(ui, ui1):
-    ui.hide()
-    ui1.show()
+        
 
 
 if __name__ == '__main__':
@@ -228,4 +280,4 @@ if __name__ == '__main__':
     ui = Ui_MainWindow()
     ui.show()
 
-    exit(app.exec_())
+    exit(app.exec())
