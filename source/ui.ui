@@ -215,7 +215,7 @@
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources>
-  <include location="../source.qrc"/>
+  <include location="source.qrc"/>
  </resources>
  <connections/>
 </ui>
