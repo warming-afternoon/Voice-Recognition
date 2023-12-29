@@ -1,47 +1,67 @@
 import sys
 import time
-from os import getcwd
-
-from playsound import playsound
+import os
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow,QFileDialog
 from PyQt5.QtCore import QThread,QObject,pyqtSignal
 
-from Test import TimeRecongniton,Recorder,Memento
+from tool.UITool import Recorder,Player,Picture
+from tool.Recognition import Recognition
 
-import process
-from keras.models import load_model
-import numpy as np
 
 # 主UI
 class Ui_MainWindow(QMainWindow):
     def __init__(self):
         super(Ui_MainWindow, self).__init__()
         self.path='./data/save/' #音频保存路径
-        self.chooseFile=''  #选中的文件
+        self.chooseFile=''  #选中文件的路径
+        self.fileName='' #选中文件的文件名
+        
+        self.pathList=[] #路径名列表
+        self.nameList=[] #纯文件名（不含路径及后缀）
+        self.nameToRow={}
+        
+        self.pictureType='waveform'
+        self.is_time_recoed = False #是实时识别
         self.start = time.time()
+        self.stop=self.start
         
-        self.is_time_recoed = False
+        self.icon_right = QtGui.QIcon(QtGui.QPixmap("./source/icon_right.png"))  # 打勾图标的路径
+        self.icon_error = QtGui.QIcon(QtGui.QPixmap("./source/icon_error.png"))  # 打叉图标的路径   
+        self.icon_question = QtGui.QIcon(QtGui.QPixmap("./source/iconQuestion.png"))  # 问号图标的路径     
         
-        self.resourceList=[]
-        self.normalResource=[]
-        self.abnormalResource=[]
-        
+        #录音
         self.rec = Recorder()
-        self.thread_one = QThread()
-        self.rec.moveToThread(self.thread_one)
-        self.thread_one.started.connect(self.rec.record)
+        self.threadRecord = QThread()
+        self.rec.moveToThread(self.threadRecord)
+        self.threadRecord.started.connect(self.rec.record)
+        self.rec.signalSaveName.connect(self.record_save)
+        self.rec.finish.connect(self.record_end)
         
-        # self.timeRecongniton=TimeRecongniton()
-        # self.thread_two = QThread()
-        # self.timeRecongniton.moveToThread(self.thread_two)
+        #播放
+        self.player=Player()
+        self.threadPlay = QThread()
+        self.player.moveToThread(self.threadPlay)
+        self.threadPlay.started.connect(self.player.play)      
         
+        #识别
+        self.recognition=Recognition()
+        self.threadRecongnize = QThread()
+        self.recognition.moveToThread(self.threadRecongnize)
+        self.threadRecongnize.started.connect(self.recognition.recognize)
+        self.recognition.result.connect(self.recognize_end)
+
+        #生成图片
+        self.picture=Picture()
+        self.threadPicture = QThread()
+        self.picture.moveToThread(self.threadPicture)
+        self.threadPicture.started.connect(self.picture.generate)
+                
+        #主界面设置
         self.setupUi(self)
         self.retranslateUi(self)
         self.slot_init()  # 槽函数设置
-        self.model_path = '.\machinelisten_final.h5'  # 模型路径
-        self.model = load_model(self.model_path, compile=False)
     
     #设置UI界面外观
     def setupUi(self, MainWindow):
@@ -57,222 +77,265 @@ class Ui_MainWindow(QMainWindow):
         MainWindow.setAutoFillBackground(True)
         
         font = QtGui.QFont()
-        font.setFamily("Agency FB")
-        font.setPointSize(20)
-        font.setBold(True)
-        font.setWeight(75)
+        font.setFamily("Microsoft YaHei") # 设置字体
+        font.setPointSize(13)
+        # font.setBold(True)
+        # font.setWeight(75)
         
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
+
+        self.listWidget = QtWidgets.QListWidget(self.centralwidget)
+        self.listWidget.setGeometry(QtCore.QRect(10, 10, 351, 501))
+        self.listWidget.setStyleSheet("background-color: rgb(207, 242, 252);")
+        self.listWidget.setObjectName("listWidget")
+        self.listWidget.setFont(font)  
+        self.listWidget.setIconSize(QtCore.QSize(25, 25));
+        
         self.label = QtWidgets.QLabel(self.centralwidget)
-        self.label.setGeometry(QtCore.QRect(500, 10, 280, 60))
-        self.label.setText("")
-        self.label.setFont(font)
+        self.label.setGeometry(QtCore.QRect(430, 30, 800, 320))
+        # self.label.setText("图片框")
+        # self.label.setFont(font)
         self.label.setStyleSheet("background-color: rgb(207, 242, 252);")
         self.label.setObjectName("label")
-        # self.label_2 = QtWidgets.QLabel(self.centralwidget)
-        # self.label_2.setGeometry(QtCore.QRect(10, 90, 300, 411))
-        # self.label_2.setStyleSheet("background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(255, 255, 255, 255), stop:1 rgba(255, 255, 255, 255));")
-        # self.label_2.setText("test2")
-        # self.label_2.setObjectName("label_2")
-        # self.label_3 = QtWidgets.QLabel(self.centralwidget)
-        # self.label_3.setGeometry(QtCore.QRect(430, 90, 411, 411))
-        # self.label_3.setStyleSheet("background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(255, 255, 255, 255), stop:1 rgba(255, 255, 255, 255));")
-        # self.label_3.setText("test3")
-        # self.label_3.setObjectName("label_3")
-        # self.label_4 = QtWidgets.QLabel(self.centralwidget)
-        # self.label_4.setGeometry(QtCore.QRect(850, 90, 411, 411))
-        # # self.label_4.setStyleSheet("background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:0, stop:0 rgba(255, 255, 255, 255), stop:1 rgba(255, 255, 255, 255));")
-        # self.label_4.setText("test4")
-        # self.label_4.setObjectName("label_4")
+
         self.pushButton = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton.setGeometry(QtCore.QRect(120, 250, 151, 51))
+        self.pushButton.setGeometry(QtCore.QRect(30, 540, 140, 65))
         self.pushButton.setStyleSheet("background-color: rgb(207, 242, 252);")
         self.pushButton.setObjectName("pushButton")
+        self.pushButton.setFont(font)
         self.pushButton_2 = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_2.setGeometry(QtCore.QRect(560, 250, 151, 51))
+        self.pushButton_2.setGeometry(QtCore.QRect(200, 540, 140, 65))
         self.pushButton_2.setStyleSheet("background-color: rgb(207, 242, 252);")
         self.pushButton_2.setObjectName("pushButton_2")
+        self.pushButton_2.setFont(font)
         self.pushButton_3 = QtWidgets.QPushButton(self.centralwidget)
-        self.pushButton_3.setGeometry(QtCore.QRect(1000, 250, 151, 51))
+        self.pushButton_3.setGeometry(QtCore.QRect(30, 630, 140, 65))
         self.pushButton_3.setStyleSheet("background-color: rgb(207, 242, 252);")
         self.pushButton_3.setObjectName("pushButton_3")
-        self.textBrowser = QtWidgets.QTextBrowser(self.centralwidget)
-        self.textBrowser.setGeometry(QtCore.QRect(20, 350, 1240, 250))
-        self.textBrowser.setStyleSheet("background-color: rgb(207, 242, 252);")
-        self.textBrowser.setObjectName("textBrowser")
-        font = QtGui.QFont()
-        font.setFamily("Arial")  # 括号里可以设置成自己想要的其它字体
-        font.setPointSize(16)
-        self.textBrowser.setFont(font)
-
-        self.splitter = QtWidgets.QSplitter(self.centralwidget)
-        self.splitter.setGeometry(QtCore.QRect(70, 630, 1140, 60))
-        self.splitter.setOrientation(QtCore.Qt.Horizontal)
-        self.splitter.setObjectName("splitter")
-        self.pushButton_4 = QtWidgets.QPushButton(self.splitter)
+        self.pushButton_3.setFont(font)
+        self.pushButton_4 = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_4.setGeometry(QtCore.QRect(200, 630, 140, 65))
         self.pushButton_4.setStyleSheet("background-color: rgb(207, 242, 252);")
         self.pushButton_4.setObjectName("pushButton_4")
-        self.pushButton_5 = QtWidgets.QPushButton(self.splitter)
+        self.pushButton_4.setFont(font)
+        
+        self.textBrowser = QtWidgets.QTextBrowser(self.centralwidget)
+        self.textBrowser.setGeometry(QtCore.QRect(400, 460, 861, 231))
+        self.textBrowser.setStyleSheet("background-color: rgb(207, 242, 252);")
+        self.textBrowser.setObjectName("textBrowser")
+        
+        textFont = QtGui.QFont()
+        textFont.setFamily("Arial")  # 设置字体
+        textFont.setPointSize(16)
+        self.textBrowser.setFont(textFont)
+
+        self.pushButton_5 = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_5.setGeometry(QtCore.QRect(460, 380, 151, 61))
         self.pushButton_5.setStyleSheet("background-color: rgb(207, 242, 252);")
         self.pushButton_5.setObjectName("pushButton_5")
-        self.pushButton_6 = QtWidgets.QPushButton(self.splitter)
+        self.pushButton_5.setFont(font)
+        self.pushButton_6 = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_6.setGeometry(QtCore.QRect(760, 380, 151, 61))
         self.pushButton_6.setStyleSheet("background-color: rgb(207, 242, 252);")
         self.pushButton_6.setObjectName("pushButton_6")
-        self.pushButton_7 = QtWidgets.QPushButton(self.splitter)
+        self.pushButton_6.setFont(font)
+        self.pushButton_7 = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_7.setGeometry(QtCore.QRect(1050, 380, 151, 61))
         self.pushButton_7.setStyleSheet("background-color: rgb(207, 242, 252);")
         self.pushButton_7.setObjectName("pushButton_7")
+        self.pushButton_7.setFont(font)
         MainWindow.setCentralWidget(self.centralwidget)
-        self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1280, 26))
-        self.menubar.setObjectName("menubar")
-        MainWindow.setMenuBar(self.menubar)
-        self.statusbar = QtWidgets.QStatusBar(MainWindow)
-        self.statusbar.setObjectName("statusbar")
-        MainWindow.setStatusBar(self.statusbar)
 
-        self.retranslateUi(MainWindow)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
     
     #设置文本
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "机器故障识别"))
-        self.label.setText(_translate("MainWindow", "机器故障识别系统"))
-        self.pushButton.setText(_translate("MainWindow", "开始录音"))
-        self.pushButton_2.setText(_translate("MainWindow", "停止录音"))
-        self.pushButton_3.setText(_translate("MainWindow", "实时识别"))
-        self.pushButton_4.setText(_translate("MainWindow", "选择音频"))
-        self.pushButton_5.setText(_translate("MainWindow", "播放音频"))
-        self.pushButton_6.setText(_translate("MainWindow", "识别音频"))
-        self.pushButton_7.setText(_translate("MainWindow", "退出"))
+        #self.label.setText(_translate("MainWindow", "图片框"))
+        self.pushButton.setText(_translate("MainWindow", "单个选取"))
+        self.pushButton_2.setText(_translate("MainWindow", "批量选取"))
+        self.pushButton_3.setText(_translate("MainWindow", "录音"))
+        self.pushButton_4.setText(_translate("MainWindow", "停止录音"))
+        self.pushButton_5.setText(_translate("MainWindow", "图片切换"))
+        self.pushButton_6.setText(_translate("MainWindow", "实时识别"))
+        self.pushButton_7.setText(_translate("MainWindow", "播放音频"))
 
     #定义槽函数，即按钮按下后响应函数
     def slot_init(self):
-        self.pushButton.clicked.connect(self.time_record)
-        self.pushButton_2.clicked.connect(self.stop_record)
-        self.pushButton_3.clicked.connect(self.time_recongniton)
-        self.pushButton_4.clicked.connect(self.choose_file)
-        self.pushButton_5.clicked.connect(self.play_video)
-        self.pushButton_6.clicked.connect(self.start_recongniton)
-        self.pushButton_7.clicked.connect(self.closeEvent)
-    
-
+        self.pushButton.clicked.connect(self.single_choose)
+        self.pushButton_2.clicked.connect(self.batch_choose)
+        self.pushButton_3.clicked.connect(self.record)
+        self.pushButton_4.clicked.connect(self.stop_record)
+        self.pushButton_5.clicked.connect(self.switch_picture)
+        self.pushButton_6.clicked.connect(self.time_record)
+        self.pushButton_7.clicked.connect(self.play_video)
+        self.listWidget.itemClicked.connect(self.itemClick)
+            
     #录音
     def record(self):
         self.is_time_recoed = False
         self.rec.set_isTime(self.is_time_recoed)
         self.textBrowser.append('已开始录音')
         self.start = time.time()
-        self.rec.set_fileList(self.resourceList)
-        self.thread_one.start()
+        self.threadRecord.start()
+        
+    #停止录音
+    def stop_record(self):
+        self.stop = time.time()
+        self.rec.stop()
+        
+    #录音结束显示
+    def record_end(self):
+        time.sleep(0.4)
+        if (self.is_time_recoed == False):
+            self.textBrowser.append('录音结束，共录制%.1f 秒'% (self.stop-self.start))
+        else:
+            self.textBrowser.append('识别结束，共识别%.1f 秒'% (self.stop-self.start))
+        self.threadRecord.exit()
 
-    #实时识别的录音部分
+    #录音保存响应
+    def record_save(self,saveName):
+        if (self.is_time_recoed == False):
+            self.textBrowser.append('音频保存为: '+saveName)
+
+        self.process(saveName)
+    
+    #音频处理
+    def process(self,pathName):
+        self.chooseFile=pathName
+        self.pathList.append(pathName)
+        splitName=self.getSplitName(pathName)
+        self.nameList.append(splitName)
+        self.start_recognize()      #识别
+        self.getPicture(splitName)  #产生图片
+        self.nameToRow[splitName]=len(self.nameList)-1
+        item=QtWidgets.QListWidgetItem(self.icon_question,splitName)
+        self.listWidget.addItem(item)
+        self.currentItem=item
+
+    #对音频进行识别
+    def start_recognize(self):
+        if self.chooseFile=='':
+            self.textBrowser.append('未选择音频')
+        else:        
+            self.recognition.setFileName(self.chooseFile)
+            self.threadRecongnize.start()
+            self.threadRecongnize.exit()
+            #self.threadRecongnize.wait()
+    
+    #识别结果展示(识别结束响应) 
+    def recognize_end(self,result,pathName):
+        splitName=self.getSplitName(pathName)
+        row=self.nameToRow[splitName]
+        item=self.listWidget.takeItem(row)
+        if result==True:
+            item.setIcon(self.icon_error)
+            if(self.is_time_recoed == True):
+                self.textBrowser.append('检测到异常！！！请及时处理' )
+        else:
+            item.setIcon(self.icon_right)
+            if(self.is_time_recoed == True):
+                self.textBrowser.append('运转正常' )
+        self.listWidget.insertItem(row,item)
+
+    #实时识别
     def time_record(self):
         self.is_time_recoed = True
         self.rec.set_isTime(self.is_time_recoed)
         self.textBrowser.append('已开始录音')
         self.start = time.time()
-        self.rec.set_fileList(self.resourceList)
-        self.thread_one.start()
-
-    #实时识别的识别部分（未完成）
-    def time_recongniton(self):
-
-        self.thread.started.connect(self.timeRecongniton.run) # 通知开始
-        self.timeRecongniton.finished.connect(self.thread.quit) # 结束后通知结束
-        self.timeRecongniton.finished.connect(self.timeRecongniton.deleteLater) # 完成后删除对象
-        self.thread.finished.connect(self.thread.deleteLater) # 完成后删除对象
-        self.timeRecongniton.progress.connect(self.result_display) # 绑定 progress 的信号
-
-        self.thread.start()
-        # Final resets (结束的时候做的事)
-        self.thread.finished.connect(
-            lambda: self.textBrowser.append('测试用')
-        )
-        
-        
-
-    ##实时识别结果显示(未完成)
-    def result_display(self,result):
-        self.textBrowser.append('识别结果：正常\n用时：%.2f' % result)
-    
-    
-    
-    
-    #停止录音（未完成）
-    def stop_record(self):
-        stop = time.time()
-        self.rec.stop()
-        self.resourceList=self.rec.get_fileList()
-        
-        if (self.is_time_recoed == False):
-            self.chooseFile= str(self.resourceList[-1])
-            self.textBrowser.append('录音结束，共录制%.1f 秒'% (stop-self.start))
-            self.textBrowser.append('文件保存名为'+self.chooseFile)
-        else:
-            self.textBrowser.append('录音结束，共识别%.1f 秒'% (stop-self.start))
-
-    
-    #对音频进行识别
-    def start_recongniton(self):
-        start = time.time()
-        self.textBrowser.append('正在识别中...')
-        
-        prediction = self.predict()
-        
-        end = time.time() - start
-        threshold = 0.91  # 来自ROC曲线
-        predicted_labels = (prediction[:, 1] > threshold).astype(int)
-        if 0 in predicted_labels:
-            self.textBrowser.append('识别结果：异常！！！请及时处理\n用时：%.2f' % end)
-        else:
-            self.textBrowser.append('识别结果：正常\n用时：%.2f' % end)
-
-            print(end)
-    
-    #音频预处理及使用模型预测
-    def predict(self):
-
-        sample = process.get_feature_vector(self.chooseFile)#特征提取、预处理
-        sample = np.expand_dims(sample, axis=0)
-        model1 = self.model
-        result = model1.predict(sample)
-        return result
+        self.threadRecord.start()
         
     #播放音频
     def play_video(self):
-        playsound(self.chooseFile)
+        if self.chooseFile=='':
+            self.textBrowser.append('未选择音频')
+        else:
+            self.textBrowser.append('开始播放音频')
+            self.player.setFileName(self.chooseFile)
+            self.threadPlay.start()
+            self.threadPlay.exit()
     
-    #选择音频
-    def choose_file(self):
+    #选择单个音频
+    def single_choose(self):
         fileName_choose, filetype = QFileDialog.getOpenFileName(
             self.centralwidget, "选取图片文件",
             './data',  # 起始路径
             "(*.wav)")  # 文件类型
-        self.chooseFile = fileName_choose  
 
         if fileName_choose != '':
-            self.textBrowser.append(fileName_choose + '文件已选中')
+            #self.textBrowser.append(os.path.basename(fileName_choose) + '文件已选中')
+            self.process(fileName_choose)
         else:
             self.textBrowser.append('文件未选中')
-        
-    #关闭UI（可能需要删掉）
-    def closeEvent(self, event):
-        ok = QtWidgets.QPushButton()
-        cancel = QtWidgets.QPushButton()
-        msg = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Warning, u'退出', u'是否退出！')
-        msg.addButton(ok, QtWidgets.QMessageBox.ActionRole)
-        msg.addButton(cancel, QtWidgets.QMessageBox.RejectRole)
-        ok.setText(u'确定')
-        cancel.setText(u'取消')
-        # print(type(msg.exec_()))
-        if msg.exec_() == 0:
-            app.quit()
-        else:
-            pass
-        
+    
+    #批量选择音频
+    def batch_choose(self):
+        for i in range(6):
+            fileName_choose, filetype = QFileDialog.getOpenFileName(
+                self.centralwidget, "选取图片文件",
+                './data/test',  # 起始路径
+                "(*.wav)")  # 文件类型
 
+            if fileName_choose != '':
+                #self.textBrowser.append(os.path.basename(fileName_choose) + '文件已选中')
+                self.process(fileName_choose)
+            else:
+                self.textBrowser.append('文件未选中')
+            
+       
+    #生成图片
+    def getPicture(self,splitName):
+        self.picture.setFileName(self.chooseFile)
+        self.picture.setSplitName(splitName)
+        self.threadPicture.start()
+        self.threadPicture.exit()
+
+    #切换图片
+    def switch_picture(self):
+        if self.pictureType=='waveform':
+            self.pictureType='spectrogram'
+        else:
+            self.pictureType='waveform'
+        self.setPicture()
+    
+    #设置图片
+    def setPicture(self):
+        row=self.listWidget.currentRow()
+        splitName=self.nameList[row]
+        if self.pictureType=='spectrogram':
+            pictureName=self.path+splitName+'_spectrogram.png'
+            self.label.setScaledContents(True)  # 设置图像自适应界面大小
+            self.label.setPixmap (QtGui.QPixmap(pictureName))
+        else:
+            pictureName=self.path+splitName+'_waveform.png'
+            self.label.setScaledContents(True)  # 设置图像自适应界面大小
+            self.label.setPixmap (QtGui.QPixmap(pictureName))
+
+    #选项点击响应
+    def itemClick(self):
+        row=self.listWidget.currentRow()
+        self.chooseFile=self.pathList[row]
+        self.setPicture()
+    
+    #获得文件名(不含路径及后缀)
+    def getSplitName(self,fileName):
+        name=os.path.basename(fileName)
+        splitName= os.path.splitext(name)[0]
+        return splitName
+    
+    #关闭UI（需修改）
+    def closeEvent(self, event):
+        app.quit()
+        for root, dirs, files in os.walk(self.path, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+
+        
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
