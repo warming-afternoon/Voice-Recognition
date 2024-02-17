@@ -310,7 +310,7 @@ class Ui_MainWindow(QMainWindow):
             self.label.setScaledContents(True)  # 设置图像自适应界面大小
             self.label.setPixmap (QtGui.QPixmap(pictureName))
         else:
-            pictureName=self.path+splitName+'_waveform.png'
+            pictureName=self.path+splitName+'_waveform.png' 
             self.label.setScaledContents(True)  # 设置图像自适应界面大小
             self.label.setPixmap (QtGui.QPixmap(pictureName))
 

@@ -21,7 +21,7 @@
 
 │   ├──UITool.py                            //UI各模块所使用到的类（除了识别）
 
-│   ├──Recognition.py                       //对语音进行识别
+│   ├──Recognition.py                       //对音频进行识别
 
 
 ├──UI.py //前端UI界面，使用模型对音频进行辨别

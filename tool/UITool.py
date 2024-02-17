@@ -182,8 +182,4 @@ class Picture(QObject):
         plt.savefig(spectrogram_path)
 
 
-# # 演示图生成用法示例
-# filename1 = "anomaly_id_00_00000044.wav"
-# output_folder_path = "E:\photoTest"
-# Plot_waveform_and_fft_freq_chart(filename1, False, output_folder_path)
 
